@@ -141,7 +141,7 @@
   <div class="members" id="membersList" style="margin-top:14px;"></div>
   <div class="empty" id="emptyState" style="display:none;">Belum ada anggota. Tambahkan nama di atas untuk mulai mencatat.</div>
 
-  <div class="section-title">Riwayat (14 hari terakhir)</div>
+  <div class="section-title">Riwayat (semua tanggal)</div>
   <div class="history"><table id="historyTable"></table></div>
 
   <div class="status" id="status"></div>
@@ -192,10 +192,10 @@ kasRef.on('value', (snap)=>{
   setStatus('Gagal konek ke database: ' + err.message, true);
 });
 
-function last14Dates(){
+function allDates(){
   const dates = new Set(Object.keys(state.records));
   dates.add(currentDate);
-  return Array.from(dates).sort().reverse().slice(0,14).sort();
+  return Array.from(dates).sort();
 }
 
 function render(){
@@ -246,7 +246,7 @@ function render(){
 }
 
 function renderHistory(memberIds){
-  const dates = last14Dates();
+  const dates = allDates();
   const table = $('historyTable');
   if(!memberIds.length){ table.innerHTML = ''; return; }
 
