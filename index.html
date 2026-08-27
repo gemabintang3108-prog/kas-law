@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Buku Kas — Tabungan Harian</title>
+<title>Buku Kas Bersama</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Spectral+SC:wght@600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -30,17 +30,32 @@
     padding: 0 0 60px;
     min-height:100vh;
   }
-  .wrap{ max-width: 620px; margin: 0 auto; padding: 22px 18px 0; }
+  .wrap{ max-width: 660px; margin: 0 auto; padding: 22px 18px 0; }
 
   header{
     display:flex; align-items:flex-end; justify-content:space-between;
     border-bottom: 3px double var(--ink);
     padding-bottom: 14px;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
   }
-  header h1{ font-family:'Spectral', serif; font-weight:700; font-size: 28px; margin:0; letter-spacing:0.3px; }
+  header h1{ font-family:'Spectral', serif; font-weight:700; font-size: 26px; margin:0; letter-spacing:0.3px; }
   header .eyebrow{ font-size:11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--ink-soft); margin-bottom:4px; }
   header .no{ font-size:12px; color:var(--ink-soft); text-align:right; }
+
+  .tabs{
+    display:flex; gap:6px; margin-bottom:18px; background:var(--card);
+    border:1px solid var(--paper-line); border-radius:10px; padding:5px;
+    box-shadow: 0 2px 0 var(--shadow);
+  }
+  .tabs button{
+    flex:1; padding:9px 6px; border:none; background:transparent; border-radius:8px;
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:11.5px; color:var(--ink-soft);
+    cursor:pointer; letter-spacing:0.3px; line-height:1.25;
+  }
+  .tabs button.active{ background:var(--ink); color:var(--paper); }
+
+  .tab-content{ display:none; }
+  .tab-content.active{ display:block; }
 
   .datebar{
     display:flex; align-items:center; gap:8px;
@@ -52,11 +67,13 @@
   .datebar input[type=date]{ flex:1; border:none; background:transparent; font-family:'IBM Plex Mono', monospace; font-size:15px; color:var(--ink); text-align:center; padding:6px; }
   .datebar .today-btn{ font-size:11px; padding:6px 10px; width:auto; white-space:nowrap; }
 
-  .summary{ display:flex; gap:10px; margin-bottom:20px; }
-  .summary .box{ flex:1; background:var(--card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; box-shadow: 0 2px 0 var(--shadow); }
+  .summary{ display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .summary .box{ flex:1; min-width:120px; background:var(--card); border:1px solid var(--paper-line); border-radius:10px; padding:12px 14px; box-shadow: 0 2px 0 var(--shadow); }
   .summary .label{ font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink-soft); }
-  .summary .value{ font-family:'Spectral',serif; font-weight:700; font-size:20px; margin-top:3px; color:var(--ink); }
+  .summary .value{ font-family:'Spectral',serif; font-weight:700; font-size:19px; margin-top:3px; color:var(--ink); }
   .summary .value.gold{ color:var(--gold); }
+  .summary .value.green{ color:var(--stamp-green-dark); }
+  .summary .value.red{ color:var(--stamp-red); }
 
   .section-title{
     font-family:'Spectral SC', serif; font-size:13px; letter-spacing:2px; text-transform:uppercase;
@@ -65,8 +82,33 @@
   .section-title::after{ content:""; flex:1; height:1px; background:var(--paper-line); }
 
   .addrow{ display:flex; gap:8px; margin-bottom:14px; }
-  .addrow input{ flex:1; padding:11px 12px; border-radius:9px; border:1px solid var(--paper-line); font-family:'IBM Plex Mono',monospace; font-size:14px; background:#fff; color:var(--ink); }
+  .addrow input, .addrow select{ padding:11px 12px; border-radius:9px; border:1px solid var(--paper-line); font-family:'IBM Plex Mono',monospace; font-size:14px; background:#fff; color:var(--ink); }
+  .addrow input[type=text]{ flex:1; }
   .addrow button{ padding:0 16px; border-radius:9px; border:none; background:var(--ink); color:var(--paper); font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; cursor:pointer; }
+
+  .ledger-form{
+    background:var(--card); border:1px solid var(--paper-line); border-radius:10px;
+    padding:14px; margin-bottom:18px; box-shadow: 0 2px 0 var(--shadow);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .ledger-form .row{ display:flex; gap:8px; }
+  .ledger-form input, .ledger-form select{
+    padding:10px 11px; border-radius:8px; border:1px solid var(--paper-line);
+    font-family:'IBM Plex Mono',monospace; font-size:13.5px; background:#fff; color:var(--ink); width:100%;
+  }
+  .ledger-form label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-soft); display:block; margin-bottom:4px; }
+  .ledger-form .field{ flex:1; }
+  .ledger-form .submit-btn{
+    padding:11px; border-radius:8px; border:none; background:var(--ink); color:var(--paper);
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13.5px; cursor:pointer;
+  }
+  .type-toggle{ display:flex; gap:8px; }
+  .type-toggle button{
+    flex:1; padding:9px; border-radius:8px; border:1.5px solid var(--paper-line); background:#fff;
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600; cursor:pointer; color:var(--ink-soft);
+  }
+  .type-toggle button.sel-masuk.active{ background:#E7F1E4; border-color:var(--stamp-green); color:var(--stamp-green-dark); }
+  .type-toggle button.sel-keluar.active{ background:#F3E2DC; border-color:var(--stamp-red); color:var(--stamp-red); }
 
   .members{ display:flex; flex-direction:column; gap:8px; }
   .member-row{ display:flex; align-items:center; gap:12px; background: var(--card); border:1px solid var(--paper-line); border-radius:10px; padding:10px 12px; box-shadow: 0 2px 0 var(--shadow); }
@@ -99,8 +141,26 @@
   .dot{ width:14px; height:14px; border-radius:4px; display:inline-block; border:1.5px solid var(--paper-line); }
   .dot.on{ background:var(--stamp-green); border-color:var(--stamp-green-dark); }
 
+  .ledger-table td.desk-col, .ledger-table th.desk-col{ text-align:left; white-space:normal; }
+  .ledger-table td.jml-col{ text-align:right; font-weight:600; }
+  tr.row-masuk td.jml-col{ color:var(--stamp-green-dark); }
+  tr.row-keluar td.jml-col{ color:var(--stamp-red); }
+  .tipe-badge{
+    font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; letter-spacing:0.4px;
+  }
+  .tipe-badge.masuk{ background:#E7F1E4; color:var(--stamp-green-dark); }
+  .tipe-badge.keluar{ background:#F3E2DC; color:var(--stamp-red); }
+  .ledger-table .del-tx{ background:none; border:none; color:#b0a385; font-size:14px; cursor:pointer; }
+
   .settings{ display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--ink-soft); margin-top:6px; }
   .settings input{ width:90px; padding:6px 8px; border-radius:7px; border:1px solid var(--paper-line); font-family:'IBM Plex Mono',monospace; font-size:13px; background:#fff; color:var(--ink); }
+
+  .export-btn{
+    width:100%; margin-top:16px; padding:12px; border-radius:9px; border:1.5px solid var(--gold);
+    background:#FBF1DD; color:#8a6714; font-family:'IBM Plex Mono',monospace; font-weight:700;
+    font-size:13px; letter-spacing:0.4px; cursor:pointer;
+  }
+  .export-btn:active{ transform: translateY(1px); }
 
   .status{ font-size:11px; color:var(--ink-soft); text-align:center; margin-top:10px; min-height:14px; }
   .reset-link{ text-align:center; margin-top:34px; }
@@ -113,43 +173,109 @@
   <header>
     <div>
       <div class="eyebrow">Buku Kas Bersama</div>
-      <h1>Tabungan Harian</h1>
+      <h1 id="pageTitle">Tabungan Harian</h1>
     </div>
     <div class="no">No. Rek —<br><span id="todayLabel"></span></div>
   </header>
 
-  <div class="datebar">
-    <button id="prevDay">‹</button>
-    <input type="date" id="dateInput">
-    <button id="nextDay">›</button>
-    <button class="today-btn" id="gotoToday">Hari ini</button>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="harian">Tabungan<br>Harian</button>
+    <button class="tab-btn" data-tab="remaja">Kas Remaja<br>Mushola</button>
+    <button class="tab-btn" data-tab="maulid">Uang<br>Maulid</button>
   </div>
 
-  <div class="summary">
-    <div class="box"><div class="label">Setor hari ini</div><div class="value" id="paidToday">0 / 0</div></div>
-    <div class="box"><div class="label">Terkumpul hari ini</div><div class="value gold" id="totalToday">Rp 0</div></div>
-    <div class="box"><div class="label">Total kas</div><div class="value gold" id="totalAll">Rp 0</div></div>
+  <!-- TAB 1: TABUNGAN HARIAN -->
+  <div class="tab-content active" id="tab-harian">
+    <div class="datebar">
+      <button id="prevDay">‹</button>
+      <input type="date" id="dateInput">
+      <button id="nextDay">›</button>
+      <button class="today-btn" id="gotoToday">Hari ini</button>
+    </div>
+
+    <div class="summary">
+      <div class="box"><div class="label">Setor hari ini</div><div class="value" id="paidToday">0 / 0</div></div>
+      <div class="box"><div class="label">Terkumpul hari ini</div><div class="value gold" id="totalToday">Rp 0</div></div>
+      <div class="box"><div class="label">Total kas</div><div class="value gold" id="totalAll">Rp 0</div></div>
+    </div>
+
+    <div class="section-title">Anggota</div>
+    <div class="addrow">
+      <input type="text" id="nameInput" placeholder="Nama anggota baru...">
+      <button id="addBtn">Tambah</button>
+    </div>
+    <div class="settings">Setoran per hari: Rp <input type="number" id="nominalInput" step="500" min="0"></div>
+
+    <div class="members" id="membersList" style="margin-top:14px;"></div>
+    <div class="empty" id="emptyState" style="display:none;">Belum ada anggota. Tambahkan nama di atas untuk mulai mencatat.</div>
+
+    <div class="section-title">Riwayat (semua tanggal)</div>
+    <div class="history"><table id="historyTable"></table></div>
+
+    <div class="reset-link"><button id="resetBtn">Hapus semua data tabungan</button></div>
   </div>
 
-  <div class="section-title">Anggota</div>
-  <div class="addrow">
-    <input type="text" id="nameInput" placeholder="Nama anggota baru...">
-    <button id="addBtn">Tambah</button>
+  <!-- TAB 2: KAS REMAJA MUSHOLA -->
+  <div class="tab-content" id="tab-remaja">
+    <div class="summary">
+      <div class="box"><div class="label">Pemasukan</div><div class="value green" id="remaja-masuk">Rp 0</div></div>
+      <div class="box"><div class="label">Pengeluaran</div><div class="value red" id="remaja-keluar">Rp 0</div></div>
+      <div class="box"><div class="label">Saldo</div><div class="value gold" id="remaja-saldo">Rp 0</div></div>
+    </div>
+
+    <div class="section-title">Tambah Transaksi</div>
+    <div class="ledger-form">
+      <div class="type-toggle">
+        <button type="button" class="sel-masuk active" data-ledger="remaja" data-type="masuk">+ Pemasukan</button>
+        <button type="button" class="sel-keluar" data-ledger="remaja" data-type="keluar">− Pengeluaran</button>
+      </div>
+      <div class="row">
+        <div class="field"><label>Tanggal</label><input type="date" id="remaja-tanggal"></div>
+        <div class="field"><label>Jumlah (Rp)</label><input type="number" id="remaja-jumlah" min="0" placeholder="0"></div>
+      </div>
+      <div class="field"><label>Deskripsi</label><input type="text" id="remaja-deskripsi" placeholder="mis. Iuran anggota / Beli sound system"></div>
+      <button class="submit-btn" id="remaja-submit">Tambah Transaksi</button>
+    </div>
+
+    <div class="section-title">Riwayat Transaksi</div>
+    <div class="history"><table class="ledger-table" id="remaja-table"></table></div>
+    <div class="empty" id="remaja-empty" style="display:none; margin-top:10px;">Belum ada transaksi.</div>
   </div>
-  <div class="settings">Setoran per hari: Rp <input type="number" id="nominalInput" step="500" min="0"></div>
 
-  <div class="members" id="membersList" style="margin-top:14px;"></div>
-  <div class="empty" id="emptyState" style="display:none;">Belum ada anggota. Tambahkan nama di atas untuk mulai mencatat.</div>
+  <!-- TAB 3: UANG MAULID -->
+  <div class="tab-content" id="tab-maulid">
+    <div class="summary">
+      <div class="box"><div class="label">Pemasukan</div><div class="value green" id="maulid-masuk">Rp 0</div></div>
+      <div class="box"><div class="label">Pengeluaran</div><div class="value red" id="maulid-keluar">Rp 0</div></div>
+      <div class="box"><div class="label">Saldo</div><div class="value gold" id="maulid-saldo">Rp 0</div></div>
+    </div>
 
-  <div class="section-title">Riwayat (semua tanggal)</div>
-  <div class="history"><table id="historyTable"></table></div>
+    <div class="section-title">Tambah Transaksi</div>
+    <div class="ledger-form">
+      <div class="type-toggle">
+        <button type="button" class="sel-masuk active" data-ledger="maulid" data-type="masuk">+ Pemasukan</button>
+        <button type="button" class="sel-keluar" data-ledger="maulid" data-type="keluar">− Pengeluaran</button>
+      </div>
+      <div class="row">
+        <div class="field"><label>Tanggal</label><input type="date" id="maulid-tanggal"></div>
+        <div class="field"><label>Jumlah (Rp)</label><input type="number" id="maulid-jumlah" min="0" placeholder="0"></div>
+      </div>
+      <div class="field"><label>Deskripsi</label><input type="text" id="maulid-deskripsi" placeholder="mis. Sumbangan warga / Beli konsumsi"></div>
+      <button class="submit-btn" id="maulid-submit">Tambah Transaksi</button>
+    </div>
 
+    <div class="section-title">Riwayat Transaksi</div>
+    <div class="history"><table class="ledger-table" id="maulid-table"></table></div>
+    <div class="empty" id="maulid-empty" style="display:none; margin-top:10px;">Belum ada transaksi.</div>
+  </div>
+
+  <button class="export-btn" id="exportBtn">⬇ Export Kas Remaja &amp; Maulid ke Excel</button>
   <div class="status" id="status"></div>
-  <div class="reset-link"><button id="resetBtn">Hapus semua data</button></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyBQwKb5BgWywX3bx3gKjNJsugJ1sUBr4X4",
@@ -163,15 +289,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const kasRef = db.ref('kasHarian');
+const remajaRef = db.ref('kasRemaja/transactions');
+const maulidRef = db.ref('kasMaulid/transactions');
 
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2,'0');
 const toDateStr = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const parseDateStr = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
-const rupiah = (n) => 'Rp ' + n.toLocaleString('id-ID');
-
-let state = { members: {}, nominal: 5000, records: {} }; // members: {id: name}
-let currentDate = toDateStr(new Date());
+const rupiah = (n) => 'Rp ' + (n||0).toLocaleString('id-ID');
 
 function setStatus(msg, isErr){
   $('status').textContent = msg;
@@ -179,7 +304,22 @@ function setStatus(msg, isErr){
   if(msg) setTimeout(()=>{ if($('status').textContent===msg) $('status').textContent=''; }, 2200);
 }
 
-// realtime listener — semua perangkat yang buka halaman ini akan otomatis ter-update
+/* ---------- TAB SWITCHING ---------- */
+const titles = { harian: 'Tabungan Harian', remaja: 'Kas Remaja Mushola', maulid: 'Uang Maulid' };
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    $('tab-' + btn.dataset.tab).classList.add('active');
+    $('pageTitle').textContent = titles[btn.dataset.tab];
+  });
+});
+
+/* ================= TAB 1: TABUNGAN HARIAN ================= */
+let state = { members: {}, nominal: 5000, records: {} };
+let currentDate = toDateStr(new Date());
+
 setStatus('Menyambungkan ke database...');
 kasRef.on('value', (snap)=>{
   const val = snap.val() || {};
@@ -187,10 +327,8 @@ kasRef.on('value', (snap)=>{
   state.nominal = (val.nominal !== undefined) ? val.nominal : 5000;
   state.records = val.records || {};
   setStatus('');
-  render();
-}, (err)=>{
-  setStatus('Gagal konek ke database: ' + err.message, true);
-});
+  renderHarian();
+}, (err)=> setStatus('Gagal konek ke database: ' + err.message, true));
 
 function allDates(){
   const dates = new Set(Object.keys(state.records));
@@ -198,7 +336,7 @@ function allDates(){
   return Array.from(dates).sort();
 }
 
-function render(){
+function renderHarian(){
   $('dateInput').value = currentDate;
   const d = parseDateStr(currentDate);
   $('todayLabel').textContent = d.toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
@@ -216,30 +354,22 @@ function render(){
     const row = document.createElement('div');
     row.className = 'member-row';
     row.innerHTML = `
-      <div class="stampbox ${paid ? 'paid' : ''}" data-id="${id}">
-        <div class="mark">LUNAS</div>
-      </div>
+      <div class="stampbox ${paid ? 'paid' : ''}" data-id="${id}"><div class="mark">LUNAS</div></div>
       <div class="name">${name}</div>
       <button class="del" data-id="${id}" data-name="${name}">✕</button>
     `;
     list.appendChild(row);
   });
 
-  list.querySelectorAll('.stampbox').forEach(el=>{
-    el.addEventListener('click', ()=> togglePaid(el.dataset.id));
-  });
-  list.querySelectorAll('.del').forEach(el=>{
-    el.addEventListener('click', ()=> removeMember(el.dataset.id, el.dataset.name));
-  });
+  list.querySelectorAll('.stampbox').forEach(el=> el.addEventListener('click', ()=> togglePaid(el.dataset.id)));
+  list.querySelectorAll('.del').forEach(el=> el.addEventListener('click', ()=> removeMember(el.dataset.id, el.dataset.name)));
 
   const paidCount = memberIds.filter(id => todayRecord[id]).length;
   $('paidToday').textContent = `${paidCount} / ${memberIds.length}`;
   $('totalToday').textContent = rupiah(paidCount * state.nominal);
 
   let grandTotal = 0;
-  Object.values(state.records).forEach(rec=>{
-    grandTotal += Object.values(rec).filter(Boolean).length * state.nominal;
-  });
+  Object.values(state.records).forEach(rec=> grandTotal += Object.values(rec).filter(Boolean).length * state.nominal);
   $('totalAll').textContent = rupiah(grandTotal);
 
   renderHistory(memberIds);
@@ -267,48 +397,156 @@ function renderHistory(memberIds){
 }
 
 function togglePaid(id){
-  const path = `records/${currentDate}/${id}`;
   const isPaid = !!(state.records[currentDate] && state.records[currentDate][id]);
-  kasRef.child(path).set(!isPaid).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
+  kasRef.child(`records/${currentDate}/${id}`).set(!isPaid).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
 }
-
 function removeMember(id, name){
   if(!confirm(`Hapus ${name} dari daftar anggota? Riwayat setoran tetap tersimpan.`)) return;
   kasRef.child(`members/${id}`).remove().catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
 }
-
 $('addBtn').addEventListener('click', ()=>{
   const val = $('nameInput').value.trim();
   if(!val) return;
   if(Object.values(state.members).includes(val)){ setStatus('Nama sudah ada.', true); return; }
-  const newRef = kasRef.child('members').push();
-  newRef.set(val).catch(()=> setStatus('Gagal menambah, coba lagi.', true));
+  kasRef.child('members').push().set(val).catch(()=> setStatus('Gagal menambah, coba lagi.', true));
   $('nameInput').value = '';
 });
 $('nameInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') $('addBtn').click(); });
-
 $('nominalInput').addEventListener('change', ()=>{
   const v = parseInt($('nominalInput').value, 10);
   kasRef.child('nominal').set(isNaN(v) ? 0 : v).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
 });
-
-$('dateInput').addEventListener('change', ()=>{
-  currentDate = $('dateInput').value || toDateStr(new Date());
-  render();
-});
-$('prevDay').addEventListener('click', ()=>{
-  const d = parseDateStr(currentDate); d.setDate(d.getDate()-1);
-  currentDate = toDateStr(d); render();
-});
-$('nextDay').addEventListener('click', ()=>{
-  const d = parseDateStr(currentDate); d.setDate(d.getDate()+1);
-  currentDate = toDateStr(d); render();
-});
-$('gotoToday').addEventListener('click', ()=>{ currentDate = toDateStr(new Date()); render(); });
-
+$('dateInput').addEventListener('change', ()=>{ currentDate = $('dateInput').value || toDateStr(new Date()); renderHarian(); });
+$('prevDay').addEventListener('click', ()=>{ const d = parseDateStr(currentDate); d.setDate(d.getDate()-1); currentDate = toDateStr(d); renderHarian(); });
+$('nextDay').addEventListener('click', ()=>{ const d = parseDateStr(currentDate); d.setDate(d.getDate()+1); currentDate = toDateStr(d); renderHarian(); });
+$('gotoToday').addEventListener('click', ()=>{ currentDate = toDateStr(new Date()); renderHarian(); });
 $('resetBtn').addEventListener('click', ()=>{
-  if(!confirm('Yakin hapus SEMUA data kas (anggota & riwayat)? Tindakan ini tidak bisa dibatalkan.')) return;
+  if(!confirm('Yakin hapus SEMUA data tabungan harian (anggota & riwayat)? Tindakan ini tidak bisa dibatalkan.')) return;
   kasRef.set(null).catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
+});
+
+/* ================= TAB 2 & 3: LEDGER (REMAJA & MAULID) ================= */
+const ledgerRefs = { remaja: remajaRef, maulid: maulidRef };
+const ledgerData = { remaja: {}, maulid: {} };
+const ledgerSelectedType = { remaja: 'masuk', maulid: 'masuk' };
+
+Object.keys(ledgerRefs).forEach(key=>{
+  $(`${key}-tanggal`).value = toDateStr(new Date());
+  ledgerRefs[key].on('value', (snap)=>{
+    ledgerData[key] = snap.val() || {};
+    renderLedger(key);
+  }, (err)=> setStatus('Gagal konek ke database: ' + err.message, true));
+});
+
+document.querySelectorAll('.type-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const key = btn.dataset.ledger;
+    ledgerSelectedType[key] = btn.dataset.type;
+    document.querySelectorAll(`.type-toggle button[data-ledger="${key}"]`).forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+function renderLedger(key){
+  const data = ledgerData[key];
+  const ids = Object.keys(data).sort((a,b)=> (data[a].tanggal||'').localeCompare(data[b].tanggal||''));
+  const table = $(`${key}-table`);
+  const emptyEl = $(`${key}-empty`);
+
+  let totalMasuk = 0, totalKeluar = 0;
+  ids.forEach(id=>{
+    const tx = data[id];
+    if(tx.tipe === 'masuk') totalMasuk += Number(tx.jumlah)||0;
+    else totalKeluar += Number(tx.jumlah)||0;
+  });
+  $(`${key}-masuk`).textContent = rupiah(totalMasuk);
+  $(`${key}-keluar`).textContent = rupiah(totalKeluar);
+  $(`${key}-saldo`).textContent = rupiah(totalMasuk - totalKeluar);
+
+  if(!ids.length){
+    table.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  const rowsDesc = ids.slice().reverse();
+  let thead = '<thead><tr><th>Tanggal</th><th>Tipe</th><th class="desk-col">Deskripsi</th><th class="jml-col">Jumlah</th><th></th></tr></thead>';
+  let tbody = '<tbody>' + rowsDesc.map(id=>{
+    const tx = data[id];
+    const d = tx.tanggal ? parseDateStr(tx.tanggal) : null;
+    const tgl = d ? `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}` : '-';
+    const sign = tx.tipe === 'masuk' ? '+' : '−';
+    return `<tr class="row-${tx.tipe}">
+      <td>${tgl}</td>
+      <td><span class="tipe-badge ${tx.tipe}">${tx.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}</span></td>
+      <td class="desk-col">${tx.deskripsi || '-'}</td>
+      <td class="jml-col">${sign} ${rupiah(tx.jumlah)}</td>
+      <td><button class="del-tx" data-key="${key}" data-id="${id}">✕</button></td>
+    </tr>`;
+  }).join('') + '</tbody>';
+
+  table.innerHTML = thead + tbody;
+  table.querySelectorAll('.del-tx').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(!confirm('Hapus transaksi ini?')) return;
+      ledgerRefs[el.dataset.key].child(el.dataset.id).remove().catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
+    });
+  });
+}
+
+function submitLedger(key){
+  const tanggal = $(`${key}-tanggal`).value || toDateStr(new Date());
+  const jumlah = parseInt($(`${key}-jumlah`).value, 10);
+  const deskripsi = $(`${key}-deskripsi`).value.trim();
+  if(!jumlah || jumlah <= 0){ setStatus('Isi jumlah dulu ya.', true); return; }
+  if(!deskripsi){ setStatus('Isi deskripsi dulu ya.', true); return; }
+  ledgerRefs[key].push().set({
+    tanggal, tipe: ledgerSelectedType[key], deskripsi, jumlah
+  }).then(()=>{
+    $(`${key}-jumlah`).value = '';
+    $(`${key}-deskripsi`).value = '';
+    setStatus('Transaksi ditambahkan.');
+  }).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
+}
+$('remaja-submit').addEventListener('click', ()=> submitLedger('remaja'));
+$('maulid-submit').addEventListener('click', ()=> submitLedger('maulid'));
+
+/* ---------- EXPORT KE EXCEL ---------- */
+function ledgerToRows(key){
+  const data = ledgerData[key];
+  const ids = Object.keys(data).sort((a,b)=> (data[a].tanggal||'').localeCompare(data[b].tanggal||''));
+  const rows = ids.map(id=>{
+    const tx = data[id];
+    return {
+      Tanggal: tx.tanggal || '',
+      Tipe: tx.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran',
+      Deskripsi: tx.deskripsi || '',
+      Jumlah: Number(tx.jumlah) || 0
+    };
+  });
+  const totalMasuk = rows.filter(r=>r.Tipe==='Pemasukan').reduce((a,r)=>a+r.Jumlah,0);
+  const totalKeluar = rows.filter(r=>r.Tipe==='Pengeluaran').reduce((a,r)=>a+r.Jumlah,0);
+  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'TOTAL PEMASUKAN', Jumlah: totalMasuk });
+  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'TOTAL PENGELUARAN', Jumlah: totalKeluar });
+  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'SALDO', Jumlah: totalMasuk - totalKeluar });
+  return rows;
+}
+
+$('exportBtn').addEventListener('click', ()=>{
+  try{
+    const wb = XLSX.utils.book_new();
+    const wsRemaja = XLSX.utils.json_to_sheet(ledgerToRows('remaja'));
+    const wsMaulid = XLSX.utils.json_to_sheet(ledgerToRows('maulid'));
+    wsRemaja['!cols'] = [{wch:12},{wch:14},{wch:34},{wch:14}];
+    wsMaulid['!cols'] = [{wch:12},{wch:14},{wch:34},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsRemaja, 'Kas Remaja Mushola');
+    XLSX.utils.book_append_sheet(wb, wsMaulid, 'Uang Maulid');
+    XLSX.writeFile(wb, `Buku-Kas-${toDateStr(new Date())}.xlsx`);
+    setStatus('File Excel diunduh.');
+  }catch(e){
+    setStatus('Gagal export: ' + e.message, true);
+  }
 });
 </script>
 </body>
