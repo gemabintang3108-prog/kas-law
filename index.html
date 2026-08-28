@@ -275,7 +275,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyBQwKb5BgWywX3bx3gKjNJsugJ1sUBr4X4",
@@ -512,37 +512,89 @@ function submitLedger(key){
 $('remaja-submit').addEventListener('click', ()=> submitLedger('remaja'));
 $('maulid-submit').addEventListener('click', ()=> submitLedger('maulid'));
 
-/* ---------- EXPORT KE EXCEL ---------- */
-function ledgerToRows(key){
+/* ---------- EXPORT KE EXCEL (pakai ExcelJS biar bisa full styling) ---------- */
+const GREEN_FONT = 'FF1F4E2C', GREEN_FILL = 'FFDCEEDA';
+const RED_FONT   = 'FF8A2E1B', RED_FILL   = 'FFF6DED6';
+const GOLD_FONT  = 'FF8A6714';
+const rupiahFmt = (n) => 'Rp ' + (Number(n)||0).toLocaleString('id-ID');
+
+function buildLedgerSheet(workbook, sheetName, key){
   const data = ledgerData[key];
   const ids = Object.keys(data).sort((a,b)=> (data[a].tanggal||'').localeCompare(data[b].tanggal||''));
-  const rows = ids.map(id=>{
-    const tx = data[id];
-    return {
-      Tanggal: tx.tanggal || '',
-      Tipe: tx.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran',
-      Deskripsi: tx.deskripsi || '',
-      Jumlah: Number(tx.jumlah) || 0
-    };
+  const ws = workbook.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 1 }] });
+
+  const headerRow = ws.addRow(['Tanggal', 'Tipe', 'Deskripsi', 'Jumlah']);
+  headerRow.eachCell(cell=>{
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2A44' } };
+    cell.alignment = { vertical: 'middle' };
   });
-  const totalMasuk = rows.filter(r=>r.Tipe==='Pemasukan').reduce((a,r)=>a+r.Jumlah,0);
-  const totalKeluar = rows.filter(r=>r.Tipe==='Pengeluaran').reduce((a,r)=>a+r.Jumlah,0);
-  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'TOTAL PEMASUKAN', Jumlah: totalMasuk });
-  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'TOTAL PENGELUARAN', Jumlah: totalKeluar });
-  rows.push({ Tanggal:'', Tipe:'', Deskripsi:'SALDO', Jumlah: totalMasuk - totalKeluar });
-  return rows;
+
+  let totalMasuk = 0, totalKeluar = 0;
+  ids.forEach(id=>{
+    const tx = data[id];
+    const jumlah = Number(tx.jumlah) || 0;
+    const isMasuk = tx.tipe === 'masuk';
+    if(isMasuk) totalMasuk += jumlah; else totalKeluar += jumlah;
+
+    const d = tx.tanggal ? parseDateStr(tx.tanggal) : null;
+    const tglText = d ? `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}` : '-';
+
+    const row = ws.addRow([
+      tglText,
+      isMasuk ? 'Pemasukan' : 'Pengeluaran',
+      tx.deskripsi || '-',
+      (isMasuk ? '+ ' : '\u2212 ') + rupiahFmt(jumlah)
+    ]);
+    const color = isMasuk ? GREEN_FONT : RED_FONT;
+    const fill = isMasuk ? GREEN_FILL : RED_FILL;
+    [row.getCell(2), row.getCell(4)].forEach(cell=>{
+      cell.font = { bold: true, color: { argb: color } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+    });
+    row.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+  });
+
+  ws.addRow([]);
+  const rowMasuk = ws.addRow(['', '', 'TOTAL PEMASUKAN', rupiahFmt(totalMasuk)]);
+  const rowKeluar = ws.addRow(['', '', 'TOTAL PENGELUARAN', rupiahFmt(totalKeluar)]);
+  const rowSaldo = ws.addRow(['', '', 'SALDO', rupiahFmt(totalMasuk - totalKeluar)]);
+  [rowMasuk, rowKeluar, rowSaldo].forEach(r=>{
+    r.getCell(3).font = { bold: true };
+    r.getCell(4).font = { bold: true };
+  });
+  rowMasuk.getCell(4).font = { bold: true, color: { argb: GREEN_FONT } };
+  rowKeluar.getCell(4).font = { bold: true, color: { argb: RED_FONT } };
+  rowSaldo.getCell(4).font = { bold: true, color: { argb: GOLD_FONT } };
+
+  // lebar kolom menyesuaikan isi terpanjang, supaya deskripsi keliatan full
+  const colWidths = [12, 14, 20, 16];
+  ws.columns.forEach((col, i)=>{
+    let maxLen = colWidths[i];
+    col.eachCell({ includeEmpty: false }, cell=>{
+      const len = (cell.value ? String(cell.value).length : 0);
+      if(len + 2 > maxLen) maxLen = len + 2;
+    });
+    col.width = Math.min(maxLen, i === 2 ? 70 : 22);
+  });
 }
 
-$('exportBtn').addEventListener('click', ()=>{
+$('exportBtn').addEventListener('click', async ()=>{
   try{
-    const wb = XLSX.utils.book_new();
-    const wsRemaja = XLSX.utils.json_to_sheet(ledgerToRows('remaja'));
-    const wsMaulid = XLSX.utils.json_to_sheet(ledgerToRows('maulid'));
-    wsRemaja['!cols'] = [{wch:12},{wch:14},{wch:34},{wch:14}];
-    wsMaulid['!cols'] = [{wch:12},{wch:14},{wch:34},{wch:14}];
-    XLSX.utils.book_append_sheet(wb, wsRemaja, 'Kas Remaja Mushola');
-    XLSX.utils.book_append_sheet(wb, wsMaulid, 'Uang Maulid');
-    XLSX.writeFile(wb, `Buku-Kas-${toDateStr(new Date())}.xlsx`);
+    setStatus('Menyiapkan file Excel...');
+    const workbook = new ExcelJS.Workbook();
+    buildLedgerSheet(workbook, 'Kas Remaja Mushola', 'remaja');
+    buildLedgerSheet(workbook, 'Uang Maulid', 'maulid');
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Buku-Kas-${toDateStr(new Date())}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     setStatus('File Excel diunduh.');
   }catch(e){
     setStatus('Gagal export: ' + e.message, true);
