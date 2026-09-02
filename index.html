@@ -196,7 +196,9 @@
     <div class="summary">
       <div class="box"><div class="label">Setor hari ini</div><div class="value" id="paidToday">0 / 0</div></div>
       <div class="box"><div class="label">Terkumpul hari ini</div><div class="value gold" id="totalToday">Rp 0</div></div>
-      <div class="box"><div class="label">Total kas</div><div class="value gold" id="totalAll">Rp 0</div></div>
+      <div class="box"><div class="label">Total setoran</div><div class="value green" id="totalAll">Rp 0</div></div>
+      <div class="box"><div class="label">Total pengeluaran</div><div class="value red" id="totalPengeluaran">Rp 0</div></div>
+      <div class="box"><div class="label">Saldo kas</div><div class="value gold" id="saldoKas">Rp 0</div></div>
     </div>
 
     <div class="section-title">Anggota</div>
@@ -211,6 +213,20 @@
 
     <div class="section-title">Riwayat (semua tanggal)</div>
     <div class="history"><table id="historyTable"></table></div>
+
+    <div class="section-title">Catat Pengeluaran Kas</div>
+    <div class="ledger-form">
+      <div class="row">
+        <div class="field"><label>Tanggal</label><input type="date" id="pengeluaran-tanggal"></div>
+        <div class="field"><label>Jumlah (Rp)</label><input type="number" id="pengeluaran-jumlah" min="0" placeholder="0"></div>
+      </div>
+      <div class="field"><label>Deskripsi</label><input type="text" id="pengeluaran-deskripsi" placeholder="mis. Bayar sewa kontrakan / Beli galon"></div>
+      <button class="submit-btn" id="pengeluaran-submit">Tambah Pengeluaran</button>
+    </div>
+
+    <div class="section-title">Riwayat Pengeluaran</div>
+    <div class="history"><table class="ledger-table" id="pengeluaran-table"></table></div>
+    <div class="empty" id="pengeluaran-empty" style="display:none; margin-top:10px;">Belum ada pengeluaran.</div>
 
     <div class="reset-link"><button id="resetBtn">Hapus semua data tabungan</button></div>
   </div>
@@ -269,7 +285,7 @@
     <div class="empty" id="maulid-empty" style="display:none; margin-top:10px;">Belum ada transaksi.</div>
   </div>
 
-  <button class="export-btn" id="exportBtn">⬇ Export Kas Remaja &amp; Maulid ke Excel</button>
+  <button class="export-btn" id="exportBtn">⬇ Export Semua Kas ke Excel</button>
   <div class="status" id="status"></div>
 </div>
 
@@ -317,7 +333,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 
 /* ================= TAB 1: TABUNGAN HARIAN ================= */
-let state = { members: {}, nominal: 5000, records: {} };
+let state = { members: {}, nominal: 5000, records: {}, pengeluaran: {} };
 let currentDate = toDateStr(new Date());
 
 setStatus('Menyambungkan ke database...');
@@ -326,6 +342,7 @@ kasRef.on('value', (snap)=>{
   state.members = val.members || {};
   state.nominal = (val.nominal !== undefined) ? val.nominal : 5000;
   state.records = val.records || {};
+  state.pengeluaran = val.pengeluaran || {};
   setStatus('');
   renderHarian();
 }, (err)=> setStatus('Gagal konek ke database: ' + err.message, true));
@@ -372,7 +389,42 @@ function renderHarian(){
   Object.values(state.records).forEach(rec=> grandTotal += Object.values(rec).filter(Boolean).length * state.nominal);
   $('totalAll').textContent = rupiah(grandTotal);
 
+  let totalPengeluaran = 0;
+  Object.values(state.pengeluaran).forEach(p=> totalPengeluaran += Number(p.jumlah)||0);
+  $('totalPengeluaran').textContent = rupiah(totalPengeluaran);
+  $('saldoKas').textContent = rupiah(grandTotal - totalPengeluaran);
+
   renderHistory(memberIds);
+  renderPengeluaran();
+}
+
+function renderPengeluaran(){
+  const ids = Object.keys(state.pengeluaran).sort((a,b)=> (state.pengeluaran[a].tanggal||'').localeCompare(state.pengeluaran[b].tanggal||''));
+  const table = $('pengeluaran-table');
+  const emptyEl = $('pengeluaran-empty');
+  if(!ids.length){ table.innerHTML = ''; emptyEl.style.display = 'block'; return; }
+  emptyEl.style.display = 'none';
+
+  const rowsDesc = ids.slice().reverse();
+  let thead = '<thead><tr><th>Tanggal</th><th class="desk-col">Deskripsi</th><th class="jml-col">Jumlah</th><th></th></tr></thead>';
+  let tbody = '<tbody>' + rowsDesc.map(id=>{
+    const p = state.pengeluaran[id];
+    const d = p.tanggal ? parseDateStr(p.tanggal) : null;
+    const tgl = d ? `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}` : '-';
+    return `<tr class="row-keluar">
+      <td>${tgl}</td>
+      <td class="desk-col">${p.deskripsi || '-'}</td>
+      <td class="jml-col">− ${rupiah(p.jumlah)}</td>
+      <td><button class="del-tx" data-id="${id}">✕</button></td>
+    </tr>`;
+  }).join('') + '</tbody>';
+  table.innerHTML = thead + tbody;
+  table.querySelectorAll('.del-tx').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(!confirm('Hapus pengeluaran ini?')) return;
+      kasRef.child(`pengeluaran/${el.dataset.id}`).remove().catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
+    });
+  });
 }
 
 function renderHistory(memberIds){
@@ -423,6 +475,20 @@ $('gotoToday').addEventListener('click', ()=>{ currentDate = toDateStr(new Date(
 $('resetBtn').addEventListener('click', ()=>{
   if(!confirm('Yakin hapus SEMUA data tabungan harian (anggota & riwayat)? Tindakan ini tidak bisa dibatalkan.')) return;
   kasRef.set(null).catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
+});
+
+$('pengeluaran-tanggal').value = toDateStr(new Date());
+$('pengeluaran-submit').addEventListener('click', ()=>{
+  const tanggal = $('pengeluaran-tanggal').value || toDateStr(new Date());
+  const jumlah = parseInt($('pengeluaran-jumlah').value, 10);
+  const deskripsi = $('pengeluaran-deskripsi').value.trim();
+  if(!jumlah || jumlah <= 0){ setStatus('Isi jumlah dulu ya.', true); return; }
+  if(!deskripsi){ setStatus('Isi deskripsi dulu ya.', true); return; }
+  kasRef.child('pengeluaran').push().set({ tanggal, deskripsi, jumlah }).then(()=>{
+    $('pengeluaran-jumlah').value = '';
+    $('pengeluaran-deskripsi').value = '';
+    setStatus('Pengeluaran ditambahkan.');
+  }).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
 });
 
 /* ================= TAB 2 & 3: LEDGER (REMAJA & MAULID) ================= */
@@ -579,10 +645,55 @@ function buildLedgerSheet(workbook, sheetName, key){
   });
 }
 
+function buildTabunganSheet(workbook){
+  const ws = workbook.addWorksheet('Tabungan Harian', { views: [{ state: 'frozen', ySplit: 1 }] });
+  const memberIds = Object.keys(state.members);
+  const dates = Array.from(new Set(Object.keys(state.records))).sort();
+
+  const headerRow = ws.addRow(['Nama', ...dates.map(ds=>{ const d=parseDateStr(ds); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`; })]);
+  headerRow.eachCell(cell=>{
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2A44' } };
+  });
+  memberIds.forEach(id=>{
+    const row = ws.addRow([state.members[id], ...dates.map(ds=> (state.records[ds] && state.records[ds][id]) ? 'v' : '')]);
+    row.getCell(1).font = { bold: true };
+  });
+  ws.getColumn(1).width = 20;
+  for(let i=2;i<=dates.length+1;i++) ws.getColumn(i).width = 8;
+
+  ws.addRow([]);
+  let grandTotal = 0;
+  Object.values(state.records).forEach(rec=> grandTotal += Object.values(rec).filter(Boolean).length * state.nominal);
+  let totalPengeluaran = 0;
+  Object.values(state.pengeluaran).forEach(p=> totalPengeluaran += Number(p.jumlah)||0);
+
+  ws.addRow(['TOTAL SETORAN', rupiahFmt(grandTotal)]).getCell(1).font = { bold: true };
+  ws.addRow(['TOTAL PENGELUARAN', rupiahFmt(totalPengeluaran)]).getCell(1).font = { bold: true };
+  ws.addRow(['SALDO KAS', rupiahFmt(grandTotal - totalPengeluaran)]).getCell(1).font = { bold: true };
+  ws.addRow([]);
+
+  const pHeaderRow = ws.addRow(['Tanggal', 'Deskripsi Pengeluaran', '', 'Jumlah']);
+  pHeaderRow.eachCell(cell=>{
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2A44' } };
+  });
+  const pIds = Object.keys(state.pengeluaran).sort((a,b)=> (state.pengeluaran[a].tanggal||'').localeCompare(state.pengeluaran[b].tanggal||''));
+  pIds.forEach(id=>{
+    const p = state.pengeluaran[id];
+    const d = p.tanggal ? parseDateStr(p.tanggal) : null;
+    const tglText = d ? `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}` : '-';
+    const row = ws.addRow([tglText, p.deskripsi || '-', '', '\u2212 ' + rupiahFmt(p.jumlah)]);
+    row.getCell(4).font = { bold: true, color: { argb: RED_FONT } };
+    row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: RED_FILL } };
+  });
+}
+
 $('exportBtn').addEventListener('click', async ()=>{
   try{
     setStatus('Menyiapkan file Excel...');
     const workbook = new ExcelJS.Workbook();
+    buildTabunganSheet(workbook);
     buildLedgerSheet(workbook, 'Kas Remaja Mushola', 'remaja');
     buildLedgerSheet(workbook, 'Uang Maulid', 'maulid');
     const buffer = await workbook.xlsx.writeBuffer();
