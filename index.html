@@ -113,7 +113,16 @@
   .members{ display:flex; flex-direction:column; gap:8px; }
   .member-row{ display:flex; align-items:center; gap:12px; background: var(--card); border:1px solid var(--paper-line); border-radius:10px; padding:10px 12px; box-shadow: 0 2px 0 var(--shadow); }
   .member-row .name{ flex:1; font-size:14.5px; }
+  .member-row .tunggakan{ font-size:10.5px; margin-top:3px; font-weight:600; }
+  .member-row .tunggakan.due{ color:var(--stamp-red); }
+  .member-row .tunggakan.clear{ color:var(--stamp-green-dark); }
   .member-row .del{ background:none; border:none; color:#b0a385; font-size:16px; cursor:pointer; padding:2px 6px; }
+  .lunasi-btn{
+    background:var(--gold); color:#fff; border:none; border-radius:8px; padding:8px 10px;
+    font-size:10.5px; font-weight:700; cursor:pointer; font-family:'IBM Plex Mono',monospace;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .lunasi-btn:disabled{ opacity:0.25; cursor:default; }
 
   .stampbox{
     position:relative; width:52px; height:52px; flex-shrink:0; border-radius:9px; border:2px solid var(--paper-line);
@@ -199,6 +208,7 @@
       <div class="box"><div class="label">Total setoran</div><div class="value green" id="totalAll">Rp 0</div></div>
       <div class="box"><div class="label">Total pengeluaran</div><div class="value red" id="totalPengeluaran">Rp 0</div></div>
       <div class="box"><div class="label">Saldo kas</div><div class="value gold" id="saldoKas">Rp 0</div></div>
+      <div class="box"><div class="label">Total tunggakan</div><div class="value red" id="totalTunggakan">Rp 0</div></div>
     </div>
 
     <div class="section-title">Anggota</div>
@@ -353,6 +363,32 @@ function allDates(){
   return Array.from(dates).sort();
 }
 
+function nameOfMemberVal(v){ return typeof v === 'string' ? v : ((v && v.name) || ''); }
+function memberName(id){ return nameOfMemberVal(state.members[id]); }
+function memberJoinDate(id){
+  const v = state.members[id];
+  if(v && typeof v === 'object' && v.joinDate) return v.joinDate;
+  const recordDates = Object.keys(state.records).sort();
+  return recordDates.length ? recordDates[0] : toDateStr(new Date());
+}
+
+// menghitung semua tanggal (dari join member sampai hari ini) yang BELUM dicentang lunas
+function unpaidInfo(id){
+  const start = parseDateStr(memberJoinDate(id));
+  const end = new Date(); end.setHours(0,0,0,0);
+  start.setHours(0,0,0,0);
+  const unpaidDates = [];
+  if(start <= end){
+    const cursor = new Date(start);
+    while(cursor <= end){
+      const ds = toDateStr(cursor);
+      if(!(state.records[ds] && state.records[ds][id])) unpaidDates.push(ds);
+      cursor.setDate(cursor.getDate()+1);
+    }
+  }
+  return { unpaidDates, count: unpaidDates.length, amount: unpaidDates.length * state.nominal };
+}
+
 function renderHarian(){
   $('dateInput').value = currentDate;
   const d = parseDateStr(currentDate);
@@ -365,14 +401,21 @@ function renderHarian(){
   $('emptyState').style.display = memberIds.length ? 'none' : 'block';
   const todayRecord = state.records[currentDate] || {};
 
+  let totalTunggakan = 0;
   memberIds.forEach((id) => {
-    const name = state.members[id];
+    const name = memberName(id);
     const paid = !!todayRecord[id];
+    const info = unpaidInfo(id);
+    totalTunggakan += info.amount;
     const row = document.createElement('div');
     row.className = 'member-row';
     row.innerHTML = `
       <div class="stampbox ${paid ? 'paid' : ''}" data-id="${id}"><div class="mark">LUNAS</div></div>
-      <div class="name">${name}</div>
+      <div class="name">
+        <div>${name}</div>
+        <div class="tunggakan ${info.count>0?'due':'clear'}">${info.count>0 ? `Nunggak ${info.count} hari (${rupiah(info.amount)})` : 'Lunas semua'}</div>
+      </div>
+      <button class="lunasi-btn" data-id="${id}" ${info.count===0?'disabled':''}>Lunasi</button>
       <button class="del" data-id="${id}" data-name="${name}">✕</button>
     `;
     list.appendChild(row);
@@ -380,6 +423,9 @@ function renderHarian(){
 
   list.querySelectorAll('.stampbox').forEach(el=> el.addEventListener('click', ()=> togglePaid(el.dataset.id)));
   list.querySelectorAll('.del').forEach(el=> el.addEventListener('click', ()=> removeMember(el.dataset.id, el.dataset.name)));
+  list.querySelectorAll('.lunasi-btn').forEach(el=> el.addEventListener('click', ()=> lunasiTunggakan(el.dataset.id)));
+
+  $('totalTunggakan').textContent = rupiah(totalTunggakan);
 
   const paidCount = memberIds.filter(id => todayRecord[id]).length;
   $('paidToday').textContent = `${paidCount} / ${memberIds.length}`;
@@ -437,7 +483,7 @@ function renderHistory(memberIds){
     '</tr></thead>';
 
   let tbody = '<tbody>' + memberIds.map(id=>{
-    const name = state.members[id];
+    const name = memberName(id);
     const cells = dates.map(ds=>{
       const on = !!(state.records[ds] && state.records[ds][id]);
       return `<td><span class="dot ${on?'on':''}"></span></td>`;
@@ -452,6 +498,27 @@ function togglePaid(id){
   const isPaid = !!(state.records[currentDate] && state.records[currentDate][id]);
   kasRef.child(`records/${currentDate}/${id}`).set(!isPaid).catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
 }
+
+// bayar borongan: tandai banyak hari yang belum dicentang sekaligus dalam 1 klik
+function lunasiTunggakan(id){
+  const info = unpaidInfo(id);
+  if(info.count === 0) return;
+  const input = prompt(
+    `${memberName(id)} nunggak ${info.count} hari (${rupiah(info.amount)}).\nMau langsung lunasi berapa hari sekarang?`,
+    info.count
+  );
+  if(input === null) return;
+  let n = parseInt(input, 10);
+  if(isNaN(n) || n <= 0){ setStatus('Jumlah hari tidak valid.', true); return; }
+  if(n > info.count) n = info.count;
+  const datesToPay = info.unpaidDates.slice(0, n);
+  const updates = {};
+  datesToPay.forEach(ds=>{ updates[`records/${ds}/${id}`] = true; });
+  kasRef.update(updates)
+    .then(()=> setStatus(`${n} hari berhasil dilunasi.`))
+    .catch(()=> setStatus('Gagal menyimpan, coba lagi.', true));
+}
+
 function removeMember(id, name){
   if(!confirm(`Hapus ${name} dari daftar anggota? Riwayat setoran tetap tersimpan.`)) return;
   kasRef.child(`members/${id}`).remove().catch(()=> setStatus('Gagal menghapus, coba lagi.', true));
@@ -459,8 +526,8 @@ function removeMember(id, name){
 $('addBtn').addEventListener('click', ()=>{
   const val = $('nameInput').value.trim();
   if(!val) return;
-  if(Object.values(state.members).includes(val)){ setStatus('Nama sudah ada.', true); return; }
-  kasRef.child('members').push().set(val).catch(()=> setStatus('Gagal menambah, coba lagi.', true));
+  if(Object.values(state.members).map(nameOfMemberVal).includes(val)){ setStatus('Nama sudah ada.', true); return; }
+  kasRef.child('members').push().set({ name: val, joinDate: toDateStr(new Date()) }).catch(()=> setStatus('Gagal menambah, coba lagi.', true));
   $('nameInput').value = '';
 });
 $('nameInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') $('addBtn').click(); });
@@ -656,7 +723,7 @@ function buildTabunganSheet(workbook){
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2A44' } };
   });
   memberIds.forEach(id=>{
-    const row = ws.addRow([state.members[id], ...dates.map(ds=> (state.records[ds] && state.records[ds][id]) ? 'v' : '')]);
+    const row = ws.addRow([memberName(id), ...dates.map(ds=> (state.records[ds] && state.records[ds][id]) ? 'v' : '')]);
     row.getCell(1).font = { bold: true };
   });
   ws.getColumn(1).width = 20;
@@ -671,6 +738,23 @@ function buildTabunganSheet(workbook){
   ws.addRow(['TOTAL SETORAN', rupiahFmt(grandTotal)]).getCell(1).font = { bold: true };
   ws.addRow(['TOTAL PENGELUARAN', rupiahFmt(totalPengeluaran)]).getCell(1).font = { bold: true };
   ws.addRow(['SALDO KAS', rupiahFmt(grandTotal - totalPengeluaran)]).getCell(1).font = { bold: true };
+  ws.addRow([]);
+
+  const tHeaderRow = ws.addRow(['REKAP TUNGGAKAN', 'Hari Belum Bayar', 'Nominal Tunggakan']);
+  tHeaderRow.eachCell(cell=>{
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2A44' } };
+  });
+  memberIds.forEach(id=>{
+    const info = unpaidInfo(id);
+    const row = ws.addRow([memberName(id), info.count, rupiahFmt(info.amount)]);
+    if(info.count > 0){
+      row.getCell(2).font = { color: { argb: RED_FONT }, bold: true };
+      row.getCell(3).font = { color: { argb: RED_FONT }, bold: true };
+    } else {
+      row.getCell(3).font = { color: { argb: GREEN_FONT } };
+    }
+  });
   ws.addRow([]);
 
   const pHeaderRow = ws.addRow(['Tanggal', 'Deskripsi Pengeluaran', '', 'Jumlah']);
